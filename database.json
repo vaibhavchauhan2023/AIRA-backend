@@ -1,0 +1,56 @@
+{
+  "users": {
+    "student-101": {
+      "type": "student",
+      "id": "e23cseu1183",
+      "name": "Vaibhav Chauhan"
+    },
+    "teacher-201": {
+      "type": "teacher",
+      "id": "ashwanisharma",
+      "name": "Ashwani Sharma"
+    }
+  },
+  "timetables": {
+    "student-101": {
+      "Monday": [
+        { "id": 1, "code": "CS-305", "name": "Machine Learning", "startTime": "09:00", "endTime": "10:00", "teacher": "Prof. Sharma" }
+      ],
+      "Tuesday": [
+        { "id": 2, "code": "CS-306", "name": "Data Structures", "startTime": "10:00", "endTime": "11:00", "teacher": "Prof. Gupta" }
+      ],
+      "Wednesday": [
+        { "id": 3, "code": "MA-201", "name": "Calculus", "startTime": "11:00", "endTime": "12:00", "teacher": "Prof. Singh" }
+      ],
+      "Thursday": [
+        { "id": 2, "code": "CS-306", "name": "Data Structures", "startTime": "10:00", "endTime": "11:00", "teacher": "Prof. Gupta" }
+      ],
+      "Friday": [
+        { "id": 1, "code": "CS-305", "name": "Machine Learning", "startTime": "09:00", "endTime": "10:00", "teacher": "Prof. Sharma" }
+      ],
+      "Saturday": [
+        { "id": 9, "code": "CS-450", "name": "Project Work", "startTime": "13:00", "endTime": "15:00", "teacher": "Prof. Singh" }
+      ],
+      "Sunday": []
+    },
+    "teacher-201": {
+      "Monday": [
+        { "id": 1, "code": "CS-305", "name": "Machine Learning", "startTime": "09:00", "endTime": "10:00", "student_count": 0 }
+      ],
+      "Tuesday": [],
+      "Wednesday": [],
+      "Thursday": [],
+      "Friday": [
+        { "id": 1, "code": "CS-305", "name": "Machine Learning", "startTime": "09:00", "endTime": "10:00", "student_count": 0 }
+      ],
+      "Saturday": [],
+      "Sunday": []
+    }
+  },
+  "class_locations": {
+    "CS-305": null,
+    "CS-306": null,
+    "MA-201": null,
+    "CS-450": null
+  }
+}
