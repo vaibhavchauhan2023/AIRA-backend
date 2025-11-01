@@ -1,72 +1,58 @@
-const bcrypt = require('bcrypt'); // <-- ADD THIS LINE
 // 1. Import necessary libraries
-require('dotenv').config(); // Load the .env file AT THE VERY TOP
+require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
-const { MongoClient } = require('mongodb'); // Import MongoDB
+const { MongoClient } = require('mongodb');
 const path = require('path');
+const bcrypt = require('bcrypt'); // Make sure bcrypt is here
 
 // 2. Initialize the app
 const app = express();
 const PORT = 4000;
 const MONGO_URI = process.env.MONGO_URI;
-const DB_NAME = 'proxy-project'; // The database name we used in the upload script
+const DB_NAME = 'proxy-project';
 
 // 3. Setup middleware
-app.use(cors());
+// --- UPGRADE ---
+// We are making our CORS policy more open for deployment
+app.use(cors()); 
+
 app.use(express.json());
 
 // ==========================================================
-// Our New "Database" Connection
+// Database Connection (No changes)
 // ==========================================================
-let db; // This variable will hold our database connection
+let db; 
 
-/**
- * Connects to MongoDB Atlas.
- * We will store ALL our data in one collection ("data")
- * and in one document ("_id: 'main'")
- */
 async function connectToDb() {
   try {
     const client = new MongoClient(MONGO_URI);
     await client.connect();
-    db = client.db(DB_NAME); // Set the global db variable
+    db = client.db(DB_NAME);
     console.log(`[SERVER] Successfully connected to MongoDB Atlas: ${DB_NAME}`);
   } catch (err) {
     console.error('[SERVER] Failed to connect to MongoDB', err);
-    process.exit(1); // Exit the app if we can't connect
+    process.exit(1);
   }
 }
 
-/**
- * Replaces our old fs.readFileSync
- * Fetches the one "main" document from our "data" collection
- */
 async function readDatabase() {
   if (!db) throw new Error('Database not connected');
-  // Find the one document that holds all our app's data
   const data = await db.collection('data').findOne({ _id: 'main' });
-  // We remove the _id field so it looks just like our old JSON file
   if (data) delete data._id;
   return data;
 }
 
-/**
- * Replaces our old fs.writeFileSync
- * Updates the "main" document in our "data" collection
- * @param {object} newData - The entire database object to save
- */
-async function writeDatabase(newData) {
+async function writeDatabase(data) {
   if (!db) throw new Error('Database not connected');
-  // Update the 'main' document with the new data
   await db.collection('data').updateOne(
     { _id: 'main' },
-    { $set: newData }
+    { $set: data }
   );
 }
 
 // ==========================================================
-// Date and Time Helpers (No changes here)
+// Date and Time Helpers
 // ==========================================================
 function getCurrentDay() {
   const options = { weekday: 'long', timeZone: 'Asia/Kolkata' };
@@ -79,27 +65,40 @@ function getCurrentTime() {
   const minute = parts.find(p => p.type === 'minute').value;
   return `${hour}:${minute}`;
 }
-function getDynamicTimetable(timetableForToday) {
+
+// --- UPGRADE: This function now also checks if the teacher started the class ---
+function getDynamicTimetable(timetableForToday, classLocations) {
   const now = getCurrentTime();
-  return timetableForToday.map(cls => ({
-    ...cls,
-    live: (now >= cls.startTime && now < cls.endTime)
-  }));
+  
+  return timetableForToday.map(cls => {
+    const classStatus = classLocations[cls.code];
+
+    // Check 1: Is the time correct?
+    const isTimeCorrect = (now >= cls.startTime && now < cls.endTime);
+    
+    // Check 2: Did the teacher activate this class?
+    const isTeacherActive = (classStatus && classStatus.isAttendanceActive === true);
+
+    // "live" is only true if BOTH are true
+    const isLive = isTimeCorrect && isTeacherActive;
+    
+    return {
+      ...cls,
+      live: isLive
+    };
+  });
 }
 
 // ==========================================================
-// API Endpoints (Now using async/await for the database)
+// API Endpoints
 // ==========================================================
 
 // --- Login Endpoint (UPGRADED) ---
-// --- Login Endpoint (UPGRADED WITH BCRYPT) ---
-// --- Login Endpoint (UPGRADED WITH BCRYPT) ---
 app.post('/api/login', async (req, res) => {
   try {
     const { userType, userId, password } = req.body;
-
-    // --- ADD THIS DEBUG LINE ---
-    console.log(`[DEBUG] Login attempt: type=${userType}, id=${userId}`);
+    
+    console.log(`[DEBUG] Login attempt: type=${userType}, id=${userId}`); // Keep debug line
     
     if (!password) {
       return res.status(400).json({ success: false, message: 'Password is required.' });
@@ -110,40 +109,32 @@ app.post('/api/login', async (req, res) => {
     const key = `${userType}-${userId}`;
     const user = dbData.users[key];
     
-    // --- ADD THIS DEBUG LINE ---
-    console.log(`[DEBUG] User found in DB:`, user);
+    console.log(`[DEBUG] User found in DB:`, user); // Keep debug line
 
-    // Step 1: Check if user exists
     if (!user) {
       return res.status(401).json({ success: false, message: 'Invalid User ID or Password' });
     }
-
-    // Step 2: Check if user has a password set
     if (!user.passwordHash) {
-      return res.status(500).json({ success: false, message: 'User has no password set. Please contact admin.' });
+      return res.status(500).json({ success: false, message: 'User has no password set.' });
     }
 
-    // Step 3: Securely compare the provided password with the stored hash
     const isMatch = await bcrypt.compare(password, user.passwordHash);
-
-    // --- ADD THIS DEBUG LINE ---
-    console.log(`[DEBUG] Password match result: ${isMatch}`);
+    console.log(`[DEBUG] Password match result: ${isMatch}`); // Keep debug line
 
     if (isMatch) {
-      // --- PASSWORD IS CORRECT ---
-      // ... (rest of the success logic)
-// ... (rest of the code is the same)
+      // --- THIS IS THE UPGRADED PART ---
       const today = getCurrentDay();
       const weeklyTimetable = dbData.timetables[key];
       const timetableForToday = weeklyTimetable ? (weeklyTimetable[today] || []) : [];
-      const dynamicTimetable = getDynamicTimetable(timetableForToday);
+      
+      // Pass the classLocations to our new function
+      const dynamicTimetable = getDynamicTimetable(timetableForToday, dbData.class_locations);
       
       const userToSend = { ...user };
       delete userToSend.passwordHash;
 
       res.json({ success: true, user: userToSend, timetable: dynamicTimetable });
     } else {
-      // --- PASSWORD IS WRONG ---
       res.status(401).json({ success: false, message: 'Invalid User ID or Password' });
     }
   } catch (err) {
@@ -151,36 +142,54 @@ app.post('/api/login', async (req, res) => {
   }
 });
 
-// --- Teacher Sets Class Location Endpoint (UPGRADED) ---
-app.post('/api/set-location', async (req, res) => { // <-- Now 'async'
+
+// --- NEW/UPGRADED: Teacher Starts Session Endpoint ---
+// This replaces '/api/set-location'
+app.post('/api/start-session', async (req, res) => {
   try {
     const { classCode, coords } = req.body;
-    const dbData = await readDatabase(); // <-- Now 'await'
+    const dbData = await readDatabase();
     
-    if (classCode in dbData.class_locations) {
-      dbData.class_locations[classCode] = coords;
-      
-      await writeDatabase(dbData); // <-- Now 'await'
-      
-      console.log(`[SERVER] Location for ${classCode} set to:`, coords);
-      res.json({ success: true, message: `Location for ${classCode} set.` });
-    } else {
-      res.status(404).json({ success: false, message: 'Class not found' });
+    if (!(classCode in dbData.class_locations)) {
+      return res.status(404).json({ success: false, message: 'Class not found' });
     }
+
+    // --- NEW LOGIC: Reset all other classes ---
+    // This ensures only one class can be active at a time.
+    for (const code in dbData.class_locations) {
+      if (code !== classCode) {
+        dbData.class_locations[code].isAttendanceActive = false;
+      }
+    }
+    
+    // --- NEW LOGIC: Activate the current class ---
+    dbData.class_locations[classCode].location = coords;
+    dbData.class_locations[classCode].isAttendanceActive = true;
+      
+    await writeDatabase(dbData);
+    
+    console.log(`[SERVER] Session started for ${classCode} at:`, coords);
+    res.json({ success: true, message: `Session for ${classCode} started.` });
+
   } catch (err) {
     res.status(500).json({ success: false, message: 'Server error: ' + err.message });
   }
 });
 
+
 // --- Student Verifies Location Endpoint (UPGRADED) ---
-app.post('/api/verify-location', async (req, res) => { // <-- Now 'async'
+// We just need to check the new data structure
+app.post('/api/verify-location', async (req, res) => {
   try {
     const { classCode, coords: studentCoords } = req.body;
-    const dbData = await readDatabase(); // <-- Now 'await'
-    const goldenCoords = dbData.class_locations[classCode];
+    const dbData = await readDatabase();
+    
+    // --- UPGRADE: Read location from new structure ---
+    const classStatus = dbData.class_locations[classCode];
+    const goldenCoords = classStatus ? classStatus.location : null;
     
     if (!goldenCoords) {
-      return res.status(400).json({ success: false, message: 'Teacher has not set the location for this class yet.' });
+      return res.status(400).json({ success: false, message: 'Teacher has not started this session yet.' });
     }
     
     const distance = calculateHaversineDistance(
@@ -188,7 +197,7 @@ app.post('/api/verify-location', async (req, res) => { // <-- Now 'async'
       studentCoords.lat, studentCoords.lon
     );
     
-    const GEOFENCE_RADIUS = 50;
+    const GEOFENCE_RADIUS = 50; 
     
     if (distance <= GEOFENCE_RADIUS) {
       res.json({ success: true, message: 'Location Verified.' });
@@ -203,25 +212,25 @@ app.post('/api/verify-location', async (req, res) => { // <-- Now 'async'
   }
 });
 
+
 // ==========================================================
-// Start the Server
+// Start the Server (Added our debug log line)
 // ==========================================================
 async function startServer() {
   console.log("!!!!!!!!!! SERVER IS RUNNING THE LATEST CODE !!!!!!!!!!");
-
-  await connectToDb(); // Connect to database FIRST
+  await connectToDb();
   
-  app.listen(PORT, () => { // THEN start listening for requests
+  app.listen(PORT, () => {
     console.log(`[SERVER] Backend server is running on http://localhost:${PORT}`);
     console.log(`[SERVER] Current server day: ${getCurrentDay()}`);
     console.log(`[SERVER] Current server time (IST): ${getCurrentTime()}`);
   });
 }
 
-startServer(); // Run the async start function
+startServer();
 
 // ==========================================================
-// Helper Function: Haversine Formula (No changes here)
+// Helper Function: Haversine Formula (No changes)
 // ==========================================================
 function calculateHaversineDistance(lat1, lon1, lat2, lon2) {
   const R = 6371000;

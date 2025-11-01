@@ -48,9 +48,9 @@
     }
   },
   "class_locations": {
-    "CS-305": null,
-    "CS-306": null,
-    "MA-201": null,
-    "CS-450": null
+    "CS-305": { "location": null, "isAttendanceActive": false },
+    "CS-306": { "location": null, "isAttendanceActive": false },
+    "MA-201": { "location": null, "isAttendanceActive": false },
+    "CS-450": { "location": null, "isAttendanceActive": false }
   }
 }
