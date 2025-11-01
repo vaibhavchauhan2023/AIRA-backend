@@ -13,9 +13,7 @@ const MONGO_URI = process.env.MONGO_URI;
 const DB_NAME = 'proxy-project'; // The database name we used in the upload script
 
 // 3. Setup middleware
-app.use(cors({
-  origin: 'http://localhost:5173' // Only allow requests from our React app
-}));
+app.use(cors());
 app.use(express.json());
 
 // ==========================================================
