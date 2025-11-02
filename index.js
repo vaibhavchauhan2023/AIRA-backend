@@ -98,7 +98,7 @@ app.post('/api/login', async (req, res) => {
   try {
     const { userType, userId, password } = req.body;
     
-    console.log(`[DEBUG] Login attempt: type=${userType}, id=${userId}`); // Keep debug line
+    console.log(`[DEBUG] Login attempt: type=${userType}, id=${userId}`);
     
     if (!password) {
       return res.status(400).json({ success: false, message: 'Password is required.' });
@@ -106,10 +106,14 @@ app.post('/api/login', async (req, res) => {
 
     const dbData = await readDatabase();
     
+    // --- UPGRADE ---
+    // The key for the user list is now just the user ID,
+    // because we combined student and teacher logins.
+    // Or, we can keep using the old key for simplicity. Let's stick to the old key.
     const key = `${userType}-${userId}`;
     const user = dbData.users[key];
     
-    console.log(`[DEBUG] User found in DB:`, user); // Keep debug line
+    console.log(`[DEBUG] User found in DB:`, user);
 
     if (!user) {
       return res.status(401).json({ success: false, message: 'Invalid User ID or Password' });
@@ -119,15 +123,22 @@ app.post('/api/login', async (req, res) => {
     }
 
     const isMatch = await bcrypt.compare(password, user.passwordHash);
-    console.log(`[DEBUG] Password match result: ${isMatch}`); // Keep debug line
+    console.log(`[DEBUG] Password match result: ${isMatch}`);
 
     if (isMatch) {
-      // --- THIS IS THE UPGRADED PART ---
+      // --- THIS IS THE NEW LOGIC ---
       const today = getCurrentDay();
-      const weeklyTimetable = dbData.timetables[key];
+      
+      // 1. Get the user's Timetable ID (e.g., "CSE-3rd-Year")
+      const timetableId = user.timetableId;
+      
+      // 2. Look up that ID in the master_timetables
+      const weeklyTimetable = dbData.master_timetables[timetableId];
+      
+      // 3. Get the classes for TODAY only
       const timetableForToday = weeklyTimetable ? (weeklyTimetable[today] || []) : [];
       
-      // Pass the classLocations to our new function
+      // 4. Dynamically calculate the 'live' status
       const dynamicTimetable = getDynamicTimetable(timetableForToday, dbData.class_locations);
       
       const userToSend = { ...user };

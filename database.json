@@ -1,56 +1,88 @@
 {
   "users": {
-    "student-101": {
+    "student-e23cseu1183": {
       "type": "student",
-      "id": "e23cseu1183",
-      "name": "Vaibhav Chauhan"
+      "id": "e23cseu01183",
+      "name": "Vaibhav Chauhan",
+      "timetableId": "CSE-3rd-Year"
+    },
+    "student-test": {
+      "type": "student",
+      "id": "test",
+      "name": "Test User",
+      "timetableId": "CSE-3rd-Year"
     },
     "teacher-201": {
       "type": "teacher",
       "id": "ashwanisharma",
-      "name": "Ashwani Sharma"
+      "name": "Ashwani Sharma",
+      "timetableId": "Teacher-Ashwani"
     }
   },
-  "timetables": {
-    "student-101": {
+  "master_timetables": {
+    "CSE-3rd-Year": {
       "Monday": [
-        { "id": 1, "code": "CS-305", "name": "Machine Learning", "startTime": "09:00", "endTime": "10:00", "teacher": "Prof. Sharma" }
+        { "id": 1, "code": "CSET 225-P", "name": "Intelligent Model Design using AI", "startTime": "08:30", "endTime": "10:30", "teacher": "Ashwani Kumar" },
+        { "id": 2, "code": "CSET 302-T", "name": "Automata Theory and Computability", "startTime": "10:30", "endTime": "11:30", "teacher": "Ragnish Kumar Chaturvedi" },
+        { "id": 3, "code": "CSET 302-L", "name": "Automata Theory and Computability", "startTime": "11:30", "endTime": "12:30", "teacher": "Ragnish Kumar Chaturvedi" },
+        { "id": 4, "code": "CSET 344-L", "name": "Image and Video Processing", "startTime": "12:30", "endTime": "13:30", "teacher": "Alok Tiwari" },
+        { "id": 5, "code": "CSET 305-L", "name": "High Performance Computing", "startTime": "14:30", "endTime": "15:30", "teacher": "Aditya Dev Mishra" },
+        { "id": 6, "code": "CSET 324-P", "name": "Software Project Management", "startTime": "15:30", "endTime": "17:30", "teacher": "Ambrish Kumar" }
       ],
       "Tuesday": [
-        { "id": 2, "code": "CS-306", "name": "Data Structures", "startTime": "10:00", "endTime": "11:00", "teacher": "Prof. Gupta" }
+        { "id": 7, "code": "CSET 304-P", "name": "Competitive Programming", "startTime": "10:30", "endTime": "12:30", "teacher": "Piyush Kumar Garg" },
+        { "id": 8, "code": "CSET 382-L", "name": "Web Technologies", "startTime": "12:30", "endTime": "13:30", "teacher": "Sheikh Moeen Ul Haque" },
+        { "id": 9, "code": "CSET 305-L", "name": "High Performance Computing", "startTime": "14:30", "endTime": "15:30", "teacher": "Aditya Dev Mishra" },
+        { "id": 10, "code": "CSET 225-L", "name": "Intelligent Model Design using AI", "startTime": "15:30", "endTime": "16:30", "teacher": "Ashwani Kumar" }
       ],
       "Wednesday": [
-        { "id": 3, "code": "MA-201", "name": "Calculus", "startTime": "11:00", "endTime": "12:00", "teacher": "Prof. Singh" }
+        { "id": 11, "code": "CSET 344-L", "name": "Image and Video Processing", "startTime": "12:30", "endTime": "13:30", "teacher": "Alok Tiwari" },
+        { "id": 12, "code": "CSET 324-L", "name": "Software Project Management", "startTime": "14:30", "endTime": "15:30", "teacher": "Neha Kumari" }
       ],
       "Thursday": [
-        { "id": 2, "code": "CS-306", "name": "Data Structures", "startTime": "10:00", "endTime": "11:00", "teacher": "Prof. Gupta" }
+        { "id": 13, "code": "CSET 305-L", "name": "High Performance Computing", "startTime": "08:30", "endTime": "09:30", "teacher": "Aditya Dev Mishra" },
+        { "id": 14, "code": "CSET 302-L", "name": "Automata Theory and Computability", "startTime": "09:30", "endTime": "10:30", "teacher": "Ragnish Kumar Chaturvedi" },
+        { "id": 15, "code": "CSET 382-L", "name": "Web Technologies", "startTime": "12:30", "endTime": "13:30", "teacher": "Sheikh Moeen Ul Haque" },
+        { "id": 16, "code": "CSET 225-L", "name": "Intelligent Model Design using AI", "startTime": "14:30", "endTime": "15:30", "teacher": "Ashwani Kumar" }
       ],
       "Friday": [
-        { "id": 1, "code": "CS-305", "name": "Machine Learning", "startTime": "09:00", "endTime": "10:00", "teacher": "Prof. Sharma" }
+        { "id": 17, "code": "CSET 344-P", "name": "Image and Video Processing", "startTime": "10:30", "endTime": "12:30", "teacher": "Gaurav Kumar Dashondhi" },
+        { "id": 18, "code": "CSET 382-L", "name": "Web Technologies", "startTime": "12:30", "endTime": "13:30", "teacher": "Sheikh Moeen Ul Haque" },
+        { "id": 19, "code": "CSET 225-L", "name": "Intelligent Model Design using AI", "startTime": "14:30", "endTime": "15:30", "teacher": "Ashwani Kumar" },
+        { "id": 20, "code": "CSET 324-L", "name": "Software Project Management", "startTime": "16:30", "endTime": "17:30", "teacher": "Neha Kumari" }
       ],
-      "Saturday": [
-        { "id": 9, "code": "CS-450", "name": "Project Work", "startTime": "13:00", "endTime": "15:00", "teacher": "Prof. Singh" }
-      ],
+      "Saturday": [],
       "Sunday": []
     },
-    "teacher-201": {
-      "Monday": [
-        { "id": 1, "code": "CS-305", "name": "Machine Learning", "startTime": "09:00", "endTime": "10:00", "student_count": 0 }
+    "Teacher-Ashwani": {
+       "Monday": [
+        { "id": 1, "code": "CSET 225-P", "name": "Intelligent Model Design using AI", "startTime": "08:30", "endTime": "10:30", "student_count": 0 }
       ],
-      "Tuesday": [],
+      "Tuesday": [
+        { "id": 10, "code": "CSET 225-L", "name": "Intelligent Model Design using AI", "startTime": "15:30", "endTime": "16:30", "student_count": 0 }
+      ],
       "Wednesday": [],
-      "Thursday": [],
+      "Thursday": [
+        { "id": 16, "code": "CSET 225-L", "name": "Intelligent Model Design using AI", "startTime": "14:30", "endTime": "15:30", "student_count": 0 }
+      ],
       "Friday": [
-        { "id": 1, "code": "CS-305", "name": "Machine Learning", "startTime": "09:00", "endTime": "10:00", "student_count": 0 }
+        { "id": 19, "code": "CSET 225-L", "name": "Intelligent Model Design using AI", "startTime": "14:30", "endTime": "15:30", "student_count": 0 }
       ],
       "Saturday": [],
       "Sunday": []
     }
   },
   "class_locations": {
-    "CS-305": { "location": null, "isAttendanceActive": false },
-    "CS-306": { "location": null, "isAttendanceActive": false },
-    "MA-201": { "location": null, "isAttendanceActive": false },
-    "CS-450": { "location": null, "isAttendanceActive": false }
+    "CSET 225-P": { "location": null, "isAttendanceActive": false },
+    "CSET 302-T": { "location": null, "isAttendanceActive": false },
+    "CSET 302-L": { "location": null, "isAttendanceActive": false },
+    "CSET 344-L": { "location": null, "isAttendanceActive": false },
+    "CSET 305-L": { "location": null, "isAttendanceActive": false },
+    "CSET 324-P": { "location": null, "isAttendanceActive": false },
+    "CSET 304-P": { "location": null, "isAttendanceActive": false },
+    "CSET 382-L": { "location": null, "isAttendanceActive": false },
+    "CSET 225-L": { "location": null, "isAttendanceActive": false },
+    "CSET 324-L": { "location": null, "isAttendanceActive": false },
+    "CSET 344-P": { "location": null, "isAttendanceActive": false }
   }
 }

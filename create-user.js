@@ -1,4 +1,3 @@
-// This is a reusable script to add new users to our database
 require('dotenv').config();
 const { MongoClient } = require('mongodb');
 const bcrypt = require('bcrypt');
@@ -7,39 +6,33 @@ const MONGO_URI = process.env.MONGO_URI;
 const DB_NAME = 'proxy-project';
 const SALT_ROUNDS = 10;
 
-/**
- * This function gets the new user details from your terminal command.
- * process.argv is an array of what you typed in the terminal.
- * [ 'node', 'create-user.js', 'student', '102', 'Priya Sharma', 'abcde' ]
- * (0)        (1)             (2)       (3)         (4)          (5)
- */
 function getCommandLineArgs() {
-  const args = process.argv.slice(2); // Get all args after 'node create-user.js'
+  const args = process.argv.slice(2); 
 
-  if (args.length !== 4) {
+  if (args.length !== 5) {
     console.error('Error: Incorrect number of arguments.');
-    console.log('Usage: node create-user.js <userType> <userId> "<UserName>" <password>');
-    console.log('Example: node create-user.js student 102 "Priya Sharma" 12345');
-    return null; // Exit
+    console.log('Usage: node create-user.js <userType> <userId> "<UserName>" <password> <timetableId>');
+    console.log('Example: node create-user.js student e23cseu01183 "Vaibhav Chauhan" 12345 CSE-3rd-Year');
+    return null; 
   }
 
-  const [userType, userId, userName, password] = args;
+  const [userType, userId, userName, password, timetableId] = args;
 
   if (userType !== 'student' && userType !== 'teacher') {
     console.error('Error: userType must be "student" or "teacher".');
     return null;
   }
 
-  return { userType, userId, userName, password };
+  return { userType, userId, userName, password, timetableId };
 }
 
-async function createNewUser() {
+async function createOrUpdateUser() {
   const input = getCommandLineArgs();
   if (!input) {
-    return; // Stop if input is invalid
+    return; 
   }
 
-  const { userType, userId, userName, password } = input;
+  const { userType, userId, userName, password, timetableId } = input;
 
   if (!MONGO_URI) {
     console.error('Error: MONGO_URI not found in .env file.');
@@ -54,45 +47,57 @@ async function createNewUser() {
     const dataCollection = db.collection('data');
     console.log('Connected to database...');
 
-    // 1. Get the current database document
     const dbData = await dataCollection.findOne({ _id: 'main' });
     if (!dbData) {
       console.error('Database document not found. Run upload-data.js first.');
+      await client.close();
       return;
     }
 
-    // 2. Check if user already exists
+    if (!dbData.master_timetables[timetableId]) {
+      console.error(`Error: Timetable ID "${timetableId}" does not exist in master_timetables.`);
+      console.log('Available IDs are:', Object.keys(dbData.master_timetables));
+      await client.close();
+      return; 
+    }
+    
     const userKey = `${userType}-${userId}`;
-    if (dbData.users[userKey]) {
-      console.error(`Error: User ${userKey} already exists.`);
-      return;
-    }
-
-    // 3. Hash the new password
-    console.log(`Hashing password "${password}"...`);
     const passwordHash = await bcrypt.hash(password, SALT_ROUNDS);
 
-    // 4. Create the new user object
-    const newUser = {
-      type: userType,
-      id: userId,
-      name: userName,
-      passwordHash: passwordHash
-    };
+    if (dbData.users[userKey]) {
+      // --- UPGRADE ---
+      // User *does* exist. Let's just update them.
+      console.log(`User ${userKey} already exists. Updating their info and password...`);
+      dbData.users[userKey].name = userName;
+      dbData.users[userKey].passwordHash = passwordHash;
+      dbData.users[userKey].timetableId = timetableId;
 
-    // 5. Add the new user
-    dbData.users[userKey] = newUser;
-    // Also add an empty timetable for them
-    dbData.timetables[userKey] = {
-      "Monday": [], "Tuesday": [], "Wednesday": [], "Thursday": [], "Friday": [], "Saturday": [], "Sunday": []
-    };
+      await dataCollection.updateOne({ _id: 'main' }, { $set: dbData });
+      console.log('✅ Success! User updated:');
+      console.log(dbData.users[userKey]);
+      // ---------------
 
-    // 6. Save the updated document back to MongoDB
-    await dataCollection.updateOne({ _id: 'main' }, { $set: dbData });
-    console.log('---------------------------------');
-    console.log('✅ Success! User created:');
-    console.log(newUser);
-    console.log('---------------------------------');
+    } else {
+      // --- ORIGINAL CODE ---
+      // User does not exist. Let's create them.
+      console.log(`Hashing password "${password}"...`);
+
+      const newUser = {
+        type: userType,
+        id: userId,
+        name: userName,
+        passwordHash: passwordHash,
+        timetableId: timetableId 
+      };
+
+      dbData.users[userKey] = newUser;
+
+      await dataCollection.updateOne({ _id: 'main' }, { $set: dbData });
+      console.log('---------------------------------');
+      console.log('✅ Success! User created:');
+      console.log(newUser);
+      console.log('---------------------------------');
+    }
 
   } catch (err) {
     console.error('An error occurred:', err);
@@ -102,4 +107,4 @@ async function createNewUser() {
   }
 }
 
-createNewUser();
+createOrUpdateUser(); // Renamed the function

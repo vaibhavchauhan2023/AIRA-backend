@@ -1,4 +1,3 @@
-// This is a safe script to update ONLY the timetables in your database
 require('dotenv').config();
 const fs = require('fs');
 const path = require('path');
@@ -17,47 +16,53 @@ async function updateTimetables() {
   const client = new MongoClient(MONGO_URI);
 
   try {
-    // 1. Connect to the database
     await client.connect();
     const db = client.db(DB_NAME);
     const dataCollection = db.collection('data');
     console.log(`Connected to database: ${DB_NAME}`);
 
-    // 2. Read the local database.json file
     const data = fs.readFileSync(DB_PATH, 'utf8');
     const databaseJson = JSON.parse(data);
     console.log('Read data from database.json successfully.');
 
-    // 3. Get ONLY the 'timetables' object
-    const localTimetables = databaseJson.timetables;
+    // --- UPGRADED ---
+    const localMasterTimetables = databaseJson.master_timetables;
+    const localClassLocations = databaseJson.class_locations;
 
-    if (!localTimetables) {
-      console.error('Error: "timetables" section not found in database.json');
+    if (!localMasterTimetables) {
+      console.error('Error: "master_timetables" section not found in database.json');
+      return;
+    }
+    if (!localClassLocations) {
+      console.error('Error: "class_locations" section not found in database.json');
       return;
     }
 
-    // 4. Safely update ONLY the 'timetables' field in the database
-    // This uses $set, so it won't overwrite users or class_locations
-    console.log('Pushing timetable changes to the live database...');
+    console.log('Pushing changes to the live database...');
     const result = await dataCollection.updateOne(
-      { _id: 'main' }, // Find our one main document
-      { $set: { timetables: localTimetables } } // And $set (update) only the timetables field
+      { _id: 'main' }, 
+      // --- UPGRADED ---
+      // Safely update BOTH master_timetables and class_locations
+      // This will not touch your users
+      { $set: { 
+          master_timetables: localMasterTimetables,
+          class_locations: localClassLocations 
+        } 
+      }
     );
 
     if (result.modifiedCount > 0) {
-      console.log('✅ Success! Your live timetables have been updated.');
+      console.log('✅ Success! Your live timetables and class locations have been updated.');
     } else {
-      console.log('Your live timetables are already up-to-date. No changes made.');
+      console.log('Your live data is already up-to-date. No changes made.');
     }
 
   } catch (err) {
     console.error('An error occurred:', err);
   } finally {
-    // 5. Close the connection
     await client.close();
     console.log('Connection closed.');
   }
 }
 
-// Run the update function
 updateTimetables();
