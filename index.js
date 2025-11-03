@@ -67,24 +67,45 @@ function getCurrentTime() {
 }
 
 // --- UPGRADE: This function now also checks if the teacher started the class ---
-function getDynamicTimetable(timetableForToday, classLocations) {
+// --- NEW FUNCTION FOR STUDENTS ---
+// This is our old function, renamed.
+// A student's class is "live" only if the time is right AND the teacher has started it.
+
+function getStudentTimetable(timetableForToday, classLocations) {
   const now = getCurrentTime();
-  
+
   return timetableForToday.map(cls => {
     const classStatus = classLocations[cls.code];
 
     // Check 1: Is the time correct?
     const isTimeCorrect = (now >= cls.startTime && now < cls.endTime);
-    
+
     // Check 2: Did the teacher activate this class?
     const isTeacherActive = (classStatus && classStatus.isAttendanceActive === true);
 
     // "live" is only true if BOTH are true
     const isLive = isTimeCorrect && isTeacherActive;
-    
+
     return {
       ...cls,
       live: isLive
+    };
+  });
+}
+
+// --- NEW FUNCTION FOR TEACHERS ---
+// A teacher's class is "live" if ONLY the time is right.
+// This allows them to see the button to start the session.
+function getTeacherTimetable(timetableForToday) {
+  const now = getCurrentTime();
+
+  return timetableForToday.map(cls => {
+    // Check 1: Is the time correct?
+    const isTimeCorrect = (now >= cls.startTime && now < cls.endTime);
+
+    return {
+      ...cls,
+      live: isTimeCorrect // The 'live' flag is set based ONLY on time.
     };
   });
 }
@@ -126,22 +147,28 @@ app.post('/api/login', async (req, res) => {
     console.log(`[DEBUG] Password match result: ${isMatch}`);
 
     if (isMatch) {
-      // --- THIS IS THE NEW LOGIC ---
       const today = getCurrentDay();
-      
-      // 1. Get the user's Timetable ID (e.g., "CSE-3rd-Year")
       const timetableId = user.timetableId;
-      
-      // 2. Look up that ID in the master_timetables
       const weeklyTimetable = dbData.master_timetables[timetableId];
-      
-      // 3. Get the classes for TODAY only
       const timetableForToday = weeklyTimetable ? (weeklyTimetable[today] || []) : [];
-      
-      // 4. Dynamically calculate the 'live' status
-      const dynamicTimetable = getDynamicTimetable(timetableForToday, dbData.class_locations);
-      
+
+      let dynamicTimetable;
+
+      // --- HERE IS THE FIX ---
+      if (user.type === 'teacher') {
+        // Teachers only need to check the time
+        dynamicTimetable = getTeacherTimetable(timetableForToday);
+      } else {
+        // Students need to check both time AND teacher activation
+        dynamicTimetable = getStudentTimetable(timetableForToday, dbData.class_locations);
+      } 
+      // ---------------------
+
       const userToSend = { ...user };
+      delete userToSend.passwordHash;
+
+      res.json({ success: true, user: userToSend, timetable: dynamicTimetable });
+      
       delete userToSend.passwordHash;
 
       res.json({ success: true, user: userToSend, timetable: dynamicTimetable });
