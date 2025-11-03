@@ -1,3 +1,4 @@
+// --- THIS IS A NEW COMMENT TO FORCE A COMMIT ---
 // 1. Import necessary libraries
 require('dotenv').config();
 const express = require('express');
@@ -168,7 +169,7 @@ app.post('/api/login', async (req, res) => {
       delete userToSend.passwordHash;
 
       res.json({ success: true, user: userToSend, timetable: dynamicTimetable });
-      
+
       delete userToSend.passwordHash;
 
       res.json({ success: true, user: userToSend, timetable: dynamicTimetable });
