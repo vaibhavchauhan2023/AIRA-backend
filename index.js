@@ -1,8 +1,9 @@
+// --- VERSION 2 ---
 // 1. Import necessary libraries
 require('dotenv').config();
 const express = require('express');
-const cors = require('cors');
-const { MongoClient, ObjectId } = require('mongodb'); // ObjectId is not used, but good to know
+const cors = require('cors'); // <-- We will use this
+const { MongoClient, ObjectId } = require('mongodb');
 const path = require('path');
 const bcrypt = require('bcrypt');
 
@@ -13,13 +14,15 @@ const MONGO_URI = process.env.MONGO_URI;
 const DB_NAME = 'proxy-project';
 
 // 3. Setup middleware
-app.use(cors({
-  origin: "https://aira-frontend-nine.vercel.app"
-}));
+// --- THIS IS THE FIX ---
+// This simple version allows ALL websites to make requests.
+// This is more robust and solves our problem.
+app.use(cors()); 
+// -----------------------
 app.use(express.json());
 
 // ==========================================================
-// Database Connection (No changes)
+// Database Connection
 // ==========================================================
 let db; 
 
@@ -35,7 +38,6 @@ async function connectToDb() {
   }
 }
 
-// These read/write functions are now our main DB interface
 async function readDatabase() {
   if (!db) throw new Error('Database not connected');
   const data = await db.collection('data').findOne({ _id: 'main' });
@@ -52,27 +54,33 @@ async function writeDatabase(data) {
 }
 
 // ==========================================================
-// Date and Time Helpers (No changes)
+// Date and Time Helpers
 // ==========================================================
-function getCurrentDay() { /* ... no change ... */ }
-function getCurrentTime() { /* ... no change ... */ }
 
-// --- UPGRADED: These functions now also pass 'presentList' ---
+function getCurrentDay() {
+  const options = { weekday: 'long', timeZone: 'Asia/Kolkata' };
+  return new Intl.DateTimeFormat('en-US', options).format(new Date());
+}
+
+function getCurrentTime() {
+  const options = { hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Kolkata', hour12: false };
+  const parts = new Intl.DateTimeFormat('en-IN', options).formatToParts(new Date());
+  const hour = parts.find(p => p.type === 'hour').value;
+  const minute = parts.find(p => p.type === 'minute').value;
+  return `${hour}:${minute}`;
+}
+
 function getStudentTimetable(timetableForToday, classLocations, userId) {
   const now = getCurrentTime();
   
   return timetableForToday.map(cls => {
     const classStatus = classLocations[cls.code];
-
     const isTimeCorrect = (now >= cls.startTime && now < cls.endTime);
     const isTeacherActive = (classStatus && classStatus.isAttendanceActive === true);
     const isLive = isTimeCorrect && isTeacherActive;
-    
-    // --- NEW ---
-    // Check if this student's ID is in the presentList
     const isMarked = (classStatus && classStatus.presentList.includes(userId));
     
-    return { ...cls, live: isLive, isMarked: isMarked }; // <-- Send isMarked
+    return { ...cls, live: isLive, isMarked: isMarked };
   });
 }
 
@@ -81,35 +89,42 @@ function getTeacherTimetable(timetableForToday, classLocations) {
   
   return timetableForToday.map(cls => {
     const classStatus = classLocations[cls.code];
-
     const isTimeCorrect = (now >= cls.startTime && now < cls.endTime);
-    
-    // --- NEW ---
-    // Pass the presentCount to the teacher's dashboard
     const presentCount = (classStatus ? classStatus.presentCount : 0);
     
-    return { ...cls, live: isTimeCorrect, presentCount: presentCount }; // <-- Send presentCount
+    return { ...cls, live: isTimeCorrect, presentCount: presentCount };
   });
 }
-
 
 // ==========================================================
 // API Endpoints
 // ==========================================================
 
-// --- Login Endpoint (UPGRADED) ---
+// --- Login Endpoint ---
 app.post('/api/login', async (req, res) => {
   try {
     const { userType, userId, password } = req.body;
-    const dbData = await readDatabase();
+    console.log(`[DEBUG] Login attempt: type=${userType}, id=${userId}`);
     
+    if (!password) {
+      return res.status(400).json({ success: false, message: 'Password is required.' });
+    }
+
+    const dbData = await readDatabase();
     const key = `${userType}-${userId}`;
     const user = dbData.users[key];
+    
+    console.log(`[DEBUG] User found in DB:`, user);
 
-    if (!user) { /* ... no change ... */ }
-    if (!user.passwordHash) { /* ... no change ... */ }
+    if (!user) {
+      return res.status(401).json({ success: false, message: 'Invalid User ID or Password' });
+    }
+    if (!user.passwordHash) {
+      return res.status(500).json({ success: false, message: 'User has no password set.' });
+    }
 
     const isMatch = await bcrypt.compare(password, user.passwordHash);
+    console.log(`[DEBUG] Password match result: ${isMatch}`);
 
     if (isMatch) {
       const today = getCurrentDay();
@@ -120,12 +135,8 @@ app.post('/api/login', async (req, res) => {
       let dynamicTimetable;
       
       if (user.type === 'teacher') {
-        // --- UPGRADED ---
-        // Pass classLocations so we can get the presentCount
         dynamicTimetable = getTeacherTimetable(timetableForToday, dbData.class_locations);
       } else {
-        // --- UPGRADED ---
-        // Pass the user.id so we can check if they are marked
         dynamicTimetable = getStudentTimetable(timetableForToday, dbData.class_locations, user.id);
       }
       
@@ -142,17 +153,11 @@ app.post('/api/login', async (req, res) => {
 });
 
 
-// --- Teacher Starts Session Endpoint (UPGRADED) ---
+// --- Teacher Starts Session Endpoint ---
 app.post('/api/start-session', async (req, res) => {
   try {
     const { classCode, coords } = req.body;
     
-    // --- THIS IS YOUR "RESET" LOGIC ---
-    // We use a direct DB command for efficiency.
-    // This finds the one 'main' document, then updates one item
-    // in the 'class_locations' map.
-    
-    // This $set command resets the class, sets it active, and adds the location.
     const updateOperation = {
       $set: {
         [`class_locations.${classCode}.isAttendanceActive`]: true,
@@ -181,11 +186,7 @@ app.post('/api/mark-attendance', async (req, res) => {
     if (!classCode || !userId) {
       return res.status(400).json({ success: false, message: 'Missing class code or user ID.' });
     }
-
-    // This is an "atomic" operation. It's safe and fast.
-    // It finds the class, increments ($inc) the count,
-    // and adds the user's ID to the list ($addToSet).
-    // $addToSet ensures a student can't be added twice.
+    
     const updateOperation = {
       $inc: { [`class_locations.${classCode}.presentCount`]: 1 },
       $addToSet: { [`class_locations.${classCode}.presentList`]: userId }
@@ -197,7 +198,6 @@ app.post('/api/mark-attendance', async (req, res) => {
       console.log(`[SERVER] Attendance marked for ${userId} in ${classCode}.`);
       res.json({ success: true, message: 'Attendance Marked!' });
     } else {
-      // This happens if $addToSet finds the user is already in the list!
       console.log(`[SERVER] Attendance was already marked for ${userId}.`);
       res.json({ success: true, message: 'Attendance Already Marked.' });
     }
@@ -208,25 +208,69 @@ app.post('/api/mark-attendance', async (req, res) => {
   }
 });
 
-// --- Student Verifies Location Endpoint (No changes) ---
-app.post('/api/verify-location', async (req, res) => { /* ... no change ... */ });
+// --- Student Verifies Location Endpoint ---
+app.post('/api/verify-location', async (req, res) => {
+  try {
+    const { classCode, coords: studentCoords } = req.body;
+    
+    const dbData = await readDatabase(); 
+    const classStatus = dbData.class_locations[classCode];
+    const goldenCoords = classStatus ? classStatus.location : null;
+    
+    if (!goldenCoords) {
+      return res.status(400).json({ success: false, message: 'Teacher has not started this session yet.' });
+    }
+    
+    const distance = calculateHaversineDistance(
+      goldenCoords.lat, goldenCoords.lon,
+      studentCoords.lat, studentCoords.lon
+    );
+    
+    // Using a 2km "demo" radius
+    const GEOFENCE_RADIUS = 2000; 
+    
+    if (distance <= GEOFENCE_RADIUS) {
+      res.json({ success: true, message: 'Location Verified.' });
+    } else {
+      res.status(400).json({
+        success: false,
+        message: `Location Mismatch. You are ${Math.round(distance)} meters away from class.`
+      });
+    }
+  } catch (err) {
+    res.status(500).json({ success: false, message: 'Server error: ' + err.message });
+  }
+});
 
-// --- Start Server (No changes) ---
-async function startServer() { /* ... no change ... */ }
+
+// ==========================================================
+// Start the Server
+// ==========================================================
+async function startServer() {
+  console.log("!!!!!!!!!! SERVER IS RUNNING THE LATEST CODE (v2) !!!!!!!!!!");
+  await connectToDb();
+  
+  app.listen(PORT, () => {
+    console.log(`[SERVER] Backend server is running on http://localhost:${PORT}`);
+    console.log(`[SERVER] Current server day: ${getCurrentDay()}`);
+    console.log(`[SERVER] Current server time (IST): ${getCurrentTime()}`);
+  });
+}
+
 startServer();
 
-// --- Haversine Formula (No changes) ---
-function calculateHaversineDistance(lat1, lon1, lat2, lon2) { /* ... no change ... */ }
-
-// Helper function definitions for date/time (to avoid "not defined" errors)
-function getCurrentDay() {
-  const options = { weekday: 'long', timeZone: 'Asia/KKolkata' };
-  return new Intl.DateTimeFormat('en-US', options).format(new Date());
-}
-function getCurrentTime() {
-  const options = { hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Kolkata', hour12: false };
-  const parts = new Intl.DateTimeFormat('en-IN', options).formatToParts(new Date());
-  const hour = parts.find(p => p.type === 'hour').value;
-  const minute = parts.find(p => p.type === 'minute').value;
-  return `${hour}:${minute}`;
+// ==========================================================
+// Helper Function: Haversine Formula (No changes)
+// ==========================================================
+function calculateHaversineDistance(lat1, lon1, lat2, lon2) {
+  const R = 6371000;
+  const phi1 = (lat1 * Math.PI) / 180;
+  const phi2 = (lat2 * Math.PI) / 180;
+  const deltaPhi = ((lat2 - lat1) * Math.PI) / 180;
+  const deltaLambda = ((lon2 - lon1) * Math.PI) / 180;
+  const a = Math.sin(deltaPhi / 2) * Math.sin(deltaPhi / 2) +
+            Math.cos(phi1) * Math.cos(phi2) *
+            Math.sin(deltaLambda / 2) * Math.sin(deltaLambda / 2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  return R * c;
 }
