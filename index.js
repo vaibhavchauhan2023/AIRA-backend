@@ -13,7 +13,9 @@ const MONGO_URI = process.env.MONGO_URI;
 const DB_NAME = 'proxy-project';
 
 // 3. Setup middleware
-app.use(cors()); 
+app.use(cors({
+  origin: "https://aira-frontend-nine.vercel.app"
+}));
 app.use(express.json());
 
 // ==========================================================
