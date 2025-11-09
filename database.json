@@ -70,6 +70,25 @@
       ],
       "Saturday": [],
       "Sunday": []
+    },
+
+    "Test-Student-Schedule": {
+    "Monday": [ { "id": 901, "code": "TEST-101", "name": "24/7 Test Class", "startTime": "00:00", "endTime": "23:59", "teacher": "Test Teacher" } ],
+    "Tuesday": [ { "id": 901, "code": "TEST-101", "name": "24/7 Test Class", "startTime": "00:00", "endTime": "23:59", "teacher": "Test Teacher" } ],
+    "Wednesday": [ { "id": 901, "code": "TEST-101", "name": "24/7 Test Class", "startTime": "00:00", "endTime": "23:59", "teacher": "Test Teacher" } ],
+    "Thursday": [ { "id": 901, "code": "TEST-101", "name": "24/7 Test Class", "startTime": "00:00", "endTime": "23:59", "teacher": "Test Teacher" } ],
+    "Friday": [ { "id": 901, "code": "TEST-101", "name": "24/7 Test Class", "startTime": "00:00", "endTime": "23:59", "teacher": "Test Teacher" } ],
+    "Saturday": [ { "id": 901, "code": "TEST-101", "name": "24/7 Test Class", "startTime": "00:00", "endTime": "23:59", "teacher": "Test Teacher" } ],
+    "Sunday": [ { "id": 901, "code": "TEST-101", "name": "24/7 Test Class", "startTime": "00:00", "endTime": "23:59", "teacher": "Test Teacher" } ]
+    },
+    "Test-Teacher-Schedule": {
+      "Monday": [ { "id": 901, "code": "TEST-101", "name": "24/7 Test Class", "startTime": "00:00", "endTime": "23:59", "student_count": 0 } ],
+      "Tuesday": [ { "id": 901, "code": "TEST-101", "name": "24/7 Test Class", "startTime": "00:00", "endTime": "23:59", "student_count": 0 } ],
+      "Wednesday": [ { "id": 901, "code": "TEST-101", "name": "24/7 Test Class", "startTime": "00:00", "endTime": "23:59", "student_count": 0 } ],
+      "Thursday": [ { "id": 901, "code": "TEST-101", "name": "24/7 Test Class", "startTime": "00:00", "endTime": "23:59", "student_count": 0 } ],
+      "Friday": [ { "id": 901, "code": "TEST-101", "name": "24/7 Test Class", "startTime": "00:00", "endTime": "23:59", "student_count": 0 } ],
+      "Saturday": [ { "id": 901, "code": "TEST-101", "name": "24/7 Test Class", "startTime": "00:00", "endTime": "23:59", "student_count": 0 } ],
+      "Sunday": [ { "id": 901, "code": "TEST-101", "name": "24/7 Test Class", "startTime": "00:00", "endTime": "23:59", "student_count": 0 } ]
     }
   },
   "class_locations": {
@@ -83,6 +102,7 @@
     "CSET 382-L": { "location": null, "isAttendanceActive": false },
     "CSET 225-L": { "location": null, "isAttendanceActive": false },
     "CSET 324-L": { "location": null, "isAttendanceActive": false },
-    "CSET 344-P": { "location": null, "isAttendanceActive": false }
+    "CSET 344-P": { "location": null, "isAttendanceActive": false },
+    "TEST-101": { "location": null, "isAttendanceActive": false }
   }
 }
