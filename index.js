@@ -229,7 +229,7 @@ app.post('/api/verify-location', async (req, res) => {
     );
     
     // Using a 2km "demo" radius
-    const GEOFENCE_RADIUS = 2000; 
+    const GEOFENCE_RADIUS = 50; 
     
     if (distance <= GEOFENCE_RADIUS) {
       res.json({ success: true, message: 'Location Verified.' });
