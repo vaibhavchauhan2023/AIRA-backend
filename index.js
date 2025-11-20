@@ -1,10 +1,7 @@
-// --- VERSION 2 ---
 // 1. Import necessary libraries
-// --- V4 FINAL DEPLOY ----
-// --- V5 FINAL DEPLOY ----
 require('dotenv').config();
 const express = require('express');
-const cors = require('cors'); // <-- We will use this
+const cors = require('cors');
 const { MongoClient, ObjectId } = require('mongodb');
 const path = require('path');
 const bcrypt = require('bcrypt');
@@ -16,11 +13,7 @@ const MONGO_URI = process.env.MONGO_URI;
 const DB_NAME = 'proxy-project';
 
 // 3. Setup middleware
-// --- THIS IS THE FIX ---
-// This simple version allows ALL websites to make requests.
-// This is more robust and solves our problem.
 app.use(cors()); 
-// -----------------------
 app.use(express.json());
 
 // ==========================================================
@@ -58,7 +51,6 @@ async function writeDatabase(data) {
 // ==========================================================
 // Date and Time Helpers
 // ==========================================================
-
 function getCurrentDay() {
   const options = { weekday: 'long', timeZone: 'Asia/Kolkata' };
   return new Intl.DateTimeFormat('en-US', options).format(new Date());
@@ -80,7 +72,7 @@ function getStudentTimetable(timetableForToday, classLocations, userId) {
     const isTimeCorrect = (now >= cls.startTime && now < cls.endTime);
     const isTeacherActive = (classStatus && classStatus.isAttendanceActive === true);
     const isLive = isTimeCorrect && isTeacherActive;
-    const isMarked = (classStatus && classStatus.presentList.includes(userId));
+    const isMarked = (classStatus && classStatus.presentList && classStatus.presentList.includes(userId));
     
     return { ...cls, live: isLive, isMarked: isMarked };
   });
@@ -102,11 +94,52 @@ function getTeacherTimetable(timetableForToday, classLocations) {
 // API Endpoints
 // ==========================================================
 
+// --- NEW ENDPOINT: Get User Details (For Refresh) ---
+// This allows the frontend to refresh data without a password
+app.post('/api/user-details', async (req, res) => {
+    try {
+        const { userId, userType } = req.body;
+        const dbData = await readDatabase();
+        const key = `${userType}-${userId}`;
+        const user = dbData.users[key];
+
+        if (!user) {
+            return res.status(404).json({ success: false, message: 'User not found' });
+        }
+
+        const today = getCurrentDay();
+        const timetableId = user.timetableId;
+        // Handle case where timetableId might be missing or master_timetables missing
+        if (!dbData.master_timetables || !dbData.master_timetables[timetableId]) {
+             return res.json({ success: true, user: user, timetable: [] });
+        }
+
+        const weeklyTimetable = dbData.master_timetables[timetableId];
+        const timetableForToday = weeklyTimetable ? (weeklyTimetable[today] || []) : [];
+        
+        let dynamicTimetable;
+        if (user.type === 'teacher') {
+            dynamicTimetable = getTeacherTimetable(timetableForToday, dbData.class_locations);
+        } else {
+            dynamicTimetable = getStudentTimetable(timetableForToday, dbData.class_locations, user.id);
+        }
+
+        // Don't send password hash
+        const userToSend = { ...user };
+        delete userToSend.passwordHash;
+
+        res.json({ success: true, user: userToSend, timetable: dynamicTimetable });
+
+    } catch (err) {
+        res.status(500).json({ success: false, message: 'Server error: ' + err.message });
+    }
+});
+
+
 // --- Login Endpoint ---
 app.post('/api/login', async (req, res) => {
   try {
     const { userType, userId, password } = req.body;
-    console.log(`[DEBUG] Login attempt: type=${userType}, id=${userId}`);
     
     if (!password) {
       return res.status(400).json({ success: false, message: 'Password is required.' });
@@ -115,8 +148,6 @@ app.post('/api/login', async (req, res) => {
     const dbData = await readDatabase();
     const key = `${userType}-${userId}`;
     const user = dbData.users[key];
-    
-    console.log(`[DEBUG] User found in DB:`, user);
 
     if (!user) {
       return res.status(401).json({ success: false, message: 'Invalid User ID or Password' });
@@ -126,7 +157,6 @@ app.post('/api/login', async (req, res) => {
     }
 
     const isMatch = await bcrypt.compare(password, user.passwordHash);
-    console.log(`[DEBUG] Password match result: ${isMatch}`);
 
     if (isMatch) {
       const today = getCurrentDay();
@@ -160,6 +190,7 @@ app.post('/api/start-session', async (req, res) => {
   try {
     const { classCode, coords } = req.body;
     
+    // Reset and Activate
     const updateOperation = {
       $set: {
         [`class_locations.${classCode}.isAttendanceActive`]: true,
@@ -171,7 +202,7 @@ app.post('/api/start-session', async (req, res) => {
 
     await db.collection('data').updateOne({ _id: 'main' }, updateOperation);
     
-    console.log(`[SERVER] Session started for ${classCode}. Attendance reset.`);
+    console.log(`[SERVER] Session started for ${classCode}.`);
     res.json({ success: true, message: `Session for ${classCode} started.` });
 
   } catch (err) {
@@ -180,7 +211,7 @@ app.post('/api/start-session', async (req, res) => {
   }
 });
 
-// --- NEW ENDPOINT: Student Marks Attendance ---
+// --- Student Marks Attendance ---
 app.post('/api/mark-attendance', async (req, res) => {
   try {
     const { classCode, userId } = req.body;
@@ -188,21 +219,40 @@ app.post('/api/mark-attendance', async (req, res) => {
     if (!classCode || !userId) {
       return res.status(400).json({ success: false, message: 'Missing class code or user ID.' });
     }
+
+    // Add user to list and increment count (only if they aren't already there)
+    // We check existence first to avoid double counting if $addToSet does nothing?
+    // Actually $addToSet handles the list uniqueness. We need to check if modified.
     
     const updateOperation = {
       $inc: { [`class_locations.${classCode}.presentCount`]: 1 },
       $addToSet: { [`class_locations.${classCode}.presentList`]: userId }
     };
     
-    const result = await db.collection('data').updateOne({ _id: 'main' }, updateOperation);
-
-    if (result.modifiedCount > 0) {
-      console.log(`[SERVER] Attendance marked for ${userId} in ${classCode}.`);
-      res.json({ success: true, message: 'Attendance Marked!' });
-    } else {
-      console.log(`[SERVER] Attendance was already marked for ${userId}.`);
-      res.json({ success: true, message: 'Attendance Already Marked.' });
+    // NOTE: There is a small logic flaw in a simple $inc + $addToSet. 
+    // If the user is already in the set, $addToSet does nothing, BUT $inc will still increment!
+    // We must fix this logic.
+    
+    // Correct Logic:
+    // 1. Read current class data
+    const dbData = await readDatabase();
+    const classInfo = dbData.class_locations[classCode];
+    
+    if (classInfo.presentList.includes(userId)) {
+         return res.json({ success: true, message: 'Attendance Already Marked.' });
     }
+    
+    // 2. If not present, THEN update
+    const result = await db.collection('data').updateOne(
+        { _id: 'main' },
+        {
+            $push: { [`class_locations.${classCode}.presentList`]: userId },
+            $inc: { [`class_locations.${classCode}.presentCount`]: 1 }
+        }
+    );
+
+    console.log(`[SERVER] Attendance marked for ${userId} in ${classCode}.`);
+    res.json({ success: true, message: 'Attendance Marked!' });
 
   } catch (err) {
     console.error("[SERVER] Error marking attendance:", err);
@@ -214,8 +264,7 @@ app.post('/api/mark-attendance', async (req, res) => {
 app.post('/api/verify-location', async (req, res) => {
   try {
     const { classCode, coords: studentCoords } = req.body;
-    
-    const dbData = await readDatabase(); 
+    const dbData = await readDatabase();
     const classStatus = dbData.class_locations[classCode];
     const goldenCoords = classStatus ? classStatus.location : null;
     
@@ -228,8 +277,7 @@ app.post('/api/verify-location', async (req, res) => {
       studentCoords.lat, studentCoords.lon
     );
     
-    // Using a 2km "demo" radius
-    const GEOFENCE_RADIUS = 50; 
+    const GEOFENCE_RADIUS = 2000; // Demo radius
     
     if (distance <= GEOFENCE_RADIUS) {
       res.json({ success: true, message: 'Location Verified.' });
@@ -244,26 +292,15 @@ app.post('/api/verify-location', async (req, res) => {
   }
 });
 
-
-// ==========================================================
-// Start the Server
-// ==========================================================
 async function startServer() {
-  console.log("!!!!!!!!!! SERVER IS RUNNING THE LATEST CODE (v2) !!!!!!!!!!");
+  console.log("!!!!!!!!!! SERVER IS RUNNING THE LATEST CODE (v6) !!!!!!!!!!");
   await connectToDb();
-  
   app.listen(PORT, () => {
     console.log(`[SERVER] Backend server is running on http://localhost:${PORT}`);
-    console.log(`[SERVER] Current server day: ${getCurrentDay()}`);
-    console.log(`[SERVER] Current server time (IST): ${getCurrentTime()}`);
   });
 }
-
 startServer();
 
-// ==========================================================
-// Helper Function: Haversine Formula (No changes)
-// ==========================================================
 function calculateHaversineDistance(lat1, lon1, lat2, lon2) {
   const R = 6371000;
   const phi1 = (lat1 * Math.PI) / 180;
