@@ -72,7 +72,9 @@ function getStudentTimetable(timetableForToday, classLocations, userId) {
     const isTimeCorrect = (now >= cls.startTime && now < cls.endTime);
     const isTeacherActive = (classStatus && classStatus.isAttendanceActive === true);
     const isLive = isTimeCorrect && isTeacherActive;
-    const isMarked = (classStatus && classStatus.presentList && classStatus.presentList.includes(userId));
+    
+    // --- CHANGED HERE: Check inside the array of objects ---
+    const isMarked = (classStatus && classStatus.presentList && classStatus.presentList.some(p => p.studentId === userId));
     
     return { ...cls, live: isLive, isMarked: isMarked };
   });
@@ -220,38 +222,28 @@ app.post('/api/mark-attendance', async (req, res) => {
       return res.status(400).json({ success: false, message: 'Missing class code or user ID.' });
     }
 
-    // Add user to list and increment count (only if they aren't already there)
-    // We check existence first to avoid double counting if $addToSet does nothing?
-    // Actually $addToSet handles the list uniqueness. We need to check if modified.
-    
-    const updateOperation = {
-      $inc: { [`class_locations.${classCode}.presentCount`]: 1 },
-      $addToSet: { [`class_locations.${classCode}.presentList`]: userId }
-    };
-    
-    // NOTE: There is a small logic flaw in a simple $inc + $addToSet. 
-    // If the user is already in the set, $addToSet does nothing, BUT $inc will still increment!
-    // We must fix this logic.
-    
-    // Correct Logic:
-    // 1. Read current class data
     const dbData = await readDatabase();
     const classInfo = dbData.class_locations[classCode];
     
-    if (classInfo.presentList.includes(userId)) {
+    // 1. Check if already marked (using the new object structure)
+    const alreadyPresent = classInfo.presentList && classInfo.presentList.some(p => p.studentId === userId);
+    
+    if (alreadyPresent) {
          return res.json({ success: true, message: 'Attendance Already Marked.' });
     }
     
-    // 2. If not present, THEN update
-    const result = await db.collection('data').updateOne(
+    // 2. Push object with ID and Time
+    const timestamp = getCurrentTime();
+    
+    await db.collection('data').updateOne(
         { _id: 'main' },
         {
-            $push: { [`class_locations.${classCode}.presentList`]: userId },
+            $push: { [`class_locations.${classCode}.presentList`]: { studentId: userId, timestamp: timestamp } },
             $inc: { [`class_locations.${classCode}.presentCount`]: 1 }
         }
     );
 
-    console.log(`[SERVER] Attendance marked for ${userId} in ${classCode}.`);
+    console.log(`[SERVER] Attendance marked for ${userId} in ${classCode} at ${timestamp}.`);
     res.json({ success: true, message: 'Attendance Marked!' });
 
   } catch (err) {
@@ -299,6 +291,37 @@ async function startServer() {
     console.log(`[SERVER] Backend server is running on http://localhost:${PORT}`);
   });
 }
+
+app.post('/api/class-attendance', async (req, res) => {
+  try {
+    const { classCode } = req.body;
+    const dbData = await readDatabase();
+    
+    const classInfo = dbData.class_locations ? dbData.class_locations[classCode] : null;
+    
+    if (!classInfo || !classInfo.presentList) {
+      return res.json({ success: true, students: [] });
+    }
+
+    // Map the presentList (ID + Time) to full User Details (Name + ID + Time)
+    const studentList = classInfo.presentList.map(entry => {
+      const userKey = `student-${entry.studentId}`;
+      const userDetails = dbData.users[userKey];
+      return {
+        name: userDetails ? userDetails.name : 'Unknown',
+        userId: entry.studentId,
+        time: entry.timestamp
+      };
+    });
+
+    res.json({ success: true, students: studentList });
+
+  } catch (err) {
+    console.error("[SERVER] Error fetching attendance list:", err);
+    res.status(500).json({ success: false, message: 'Server error.' });
+  }
+});
+
 startServer();
 
 function calculateHaversineDistance(lat1, lon1, lat2, lon2) {
